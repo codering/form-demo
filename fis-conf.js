@@ -1,38 +1,38 @@
+
+// 按需编译。
+fis.set('project.files', '/index.html');
+
+// 采用 commonjs 模块化方案。
 fis.hook('commonjs', {
-    baseUrl: './client',
-    extList: ['.js', '.jsx', '.es', '.ts', '.tsx']
+    baseUrl: './modules',
+    extList: ['.js', '.jsx'],
+    path: {
+      'http': 'http/http.js'
+    }
 });
 
-// client为项目目录
-fis.match('/{node_modules, client}/**.js', {
-    isMod: true,
-    useSameNameRequire: true
+// 改用 npm 方案，而不是用 fis-components
+fis.unhook('components');
+fis.hook('node_modules');
+
+// 编译ES6
+fis.match('{*.jsx,/modules/**.js}', {
+  rExt: 'js',
+  parser: fis.plugin('babel-5.x', {
+    optional: ["es7.decorators", "es7.classProperties"]
+  },{
+    presets: ["es2015", "react", "stage-0"]
+  })
 });
 
-fis.match('{*.{es,jsx},/client/**.js}', {
-    rExt: 'js',
-    isMod: true,
-    useSameNameRequire: true,
-    parser: fis.plugin('babel-5.x', {}, {
-        presets: ["es2015", "react", "stage-0"]
-    })
-});
-
-// 用 node-sass 解析
-fis.match('*.scss', {
-    rExt: 'css',
-    parser: [
-        fis.plugin('node-sass', {
-            include_paths: [
-                'static/scss'
-            ] || []
-        })
-    ],
-    postprocessor: fis.plugin('autoprefixer')
+// 设置成是模块化 js
+fis.match('/{node_modules,modules}/**.{js,jsx}', {
+  isMod: true,
+  useSameNameRequire: true
 });
 
 // 添加css和image加载支持
-fis.match('*.{js,jsx,ts,tsx,es}', {
+fis.match('*.{js,jsx}', {
     preprocessor: [
       fis.plugin('js-require-css'),
       fis.plugin('js-require-file', {
@@ -41,34 +41,52 @@ fis.match('*.{js,jsx,ts,tsx,es}', {
     ]
 })
 
-// antd 转换
-fis.match('/node_modules/antd/lib/**.js', {
-    //parser: fis.plugin("translate-es3ify")
+// antd 转换 便于兼容IE8
+fis.match('/node_modules/antd/**.js', {
+    parser: fis.plugin("translate-es3ify")
 })
 
-fis.match('{**.js, !/node_modules/antd/lib/**.js, !/client/**.js}', {
-    //optimizer: fis.plugin('uglify-js')
+// 第三方js太多了，合并下
+fis.match('/node_modules/**.js', {
+    //optimizer: fis.plugin('uglify-js'),
+    packTo: '/pkg/vendor.js'
 })
-
-
-fis.match('/client/static/**.js', {
-  parser: null,
-  isMod: false
-});
 
 // 用 loader 来自动引入资源。
 fis.match('::package', {
     postpackager: fis.plugin('loader',{
-      //allInOne: true
+      //useInlineMap: true
+      //allInOne: true,
     })
 });
 
-// 禁用components
-fis.unhook('components')
-fis.hook('node_modules', {
-  useDev: true
+/**********生产环境打包策略 Begin *********************/
+fis.media("production")
+ .match('**', {
+  domain: "/spb", // 配合后端发布，设置context
+  deploy: [
+    fis.plugin('skip-packed'), // 过滤掉已经被打包的资源.
+    fis.plugin('local-deliver', {
+         to: 'output'
+    })
+ ]
+})
+.match('*.{js,jsx,css,png}', { // 文件名加 md5
+  useHash: true
+})
+.match('*.{js,jsx}', {
+  optimizer: fis.plugin('uglify-js')  // js 压缩
+})
+.match('/modules/**.{js,jsx}', { // modules目录下的打包为app.js
+  packTo: '/pkg/app.js'
+})
+.match('*.css', {
+  optimizer: fis.plugin('clean-css'), // css 压缩
+  packTo: "/pkg/all.css"   // 打包成一个 all.css
+})
+.match('*.png', {
+  optimizer: fis.plugin('png-compressor'), // 图片压缩
+  release: false   // 当前工程图片的用到了inline语法，这里设置为不发布
 })
 
-fis.match('/client/index.jsx', {
-  isMod: false
-})
+/**********生产环境打包策略 End*********************/
