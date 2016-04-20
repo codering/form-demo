@@ -63,7 +63,7 @@ fis.match('::package', {
 /**********生产环境打包策略 Begin *********************/
 fis.media("production")
  .match('**', {
-  domain: "/spb", // 配合后端发布，设置context
+  //domain: "/spb", // 配合后端发布，设置context
   deploy: [
     fis.plugin('skip-packed'), // 过滤掉已经被打包的资源.
     fis.plugin('local-deliver', {
